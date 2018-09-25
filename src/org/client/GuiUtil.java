@@ -27,10 +27,11 @@ public class GuiUtil {
 
 	public static String getIPAdress() throws CancellationException {
 		Frame frame = new JFrame("Mon Cloud");
-		String serverAddress = JOptionPane.showInputDialog(frame, "Entrez l'adresse IP de cloud",
+		String serverAddress = JOptionPane.showInputDialog(frame, "Entrez l'adresse IP du cloud", "Mon Cloud",
 				JOptionPane.QUESTION_MESSAGE);
 		while (!isIPv4(serverAddress)) {
-			serverAddress = JOptionPane.showInputDialog(frame, "Entrez l'adresse IP de cloud",
+			JOptionPane.showMessageDialog(frame, "L'adresse IP n'a pas le bon format", "Erreur", JOptionPane.ERROR_MESSAGE);
+			serverAddress = JOptionPane.showInputDialog(frame, "Entrez l'adresse IP du cloud", "Mon Cloud",
 					JOptionPane.QUESTION_MESSAGE);
 		}
 		return serverAddress;
@@ -52,9 +53,36 @@ public class GuiUtil {
 					return false;
 				}
 			}
-		} catch (ParseException e) {
+		} catch (NumberFormatException e) {
 			return false;
 		}
 		return !IP.endsWith(".");
+	}
+	
+	public static int getPort() throws CancellationException {
+		Frame frame = new JFrame("Mon Cloud");
+		String serverAddress = JOptionPane.showInputDialog(frame, "Entrez le port du cloud", "Mon Cloud",
+				JOptionPane.QUESTION_MESSAGE);
+		
+		while (!isGoodPort(serverAddress)) {
+			JOptionPane.showMessageDialog(frame, "Le port doit être entre 5000 et 5050", "Erreur", JOptionPane.ERROR_MESSAGE);
+			serverAddress = JOptionPane.showInputDialog(frame, "Entrez le port du cloud", "Mon Cloud",
+					JOptionPane.QUESTION_MESSAGE);
+		}
+		return Integer.parseInt(serverAddress);
+	}
+	
+	private static boolean isGoodPort(String port) {
+		if (port==null)
+		{
+			throw new CancellationException();
+		}
+		try {
+			int intPort = Integer.parseInt(port);
+			return intPort>=5000 && intPort<=5050;
+		}
+		catch (NumberFormatException e) {
+			return false;
+		}
 	}
 }
