@@ -42,6 +42,7 @@ public class MainServer {
 		}
 	}
 	
+	// Creates a new thread for each client
 	private static class Client extends Thread {
 		private Socket socket;
         
@@ -67,6 +68,7 @@ public class MainServer {
 			}
 		}
 	    
+		// Read the action required by the client
 		private String getAction() throws CancellationException {
 			try {
 				ObjectInputStream in = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
@@ -90,16 +92,18 @@ public class MainServer {
 			}
 		}
 		
+		// Do the action
 		private void doAction(String action) throws CancellationException {
 		
 			String[] commandAndName = action.split(" ");
 			String command = commandAndName[0];
 			String name = commandAndName[1];
 			
+			// create the root from which the client cannot escape (server space)
 			String userName = System.getProperty("user.name");			
 			Path root = Paths.get("C:","Users",userName,"Documents");
 			if(!Files.exists(Paths.get(root.toString(),"root")))
-				new File(root.toString(),"TestRoot").mkdir();
+				new File(root.toString(),"Root").mkdir();
 			
 			switch(command) {
 			case "cd":
