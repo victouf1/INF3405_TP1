@@ -125,12 +125,12 @@ public class MainServer {
 				name = commandAndName[1];
 			}
 			
+			List<String> info = new ArrayList<String>();
 			switch(command) {
 			case "cd":
 				cdAction(name);
 				break;
 			case "pwd":
-				List<String> info = new ArrayList<String>();
 				Path relativePath = rootPath.relativize(userPath);
 				if(relativePath.toString().equals(""))
 					info.add(userPath.toString().substring(userPath.toString().lastIndexOf('\\') + 1));
@@ -143,6 +143,8 @@ public class MainServer {
 				break;
 			case "mkdir":
 				new File(userPath.toString(), name).mkdir();
+				info.add("Le dossier " + name + " a été créé\n");
+				sendInfoToClient(info);
 				break;
 			case "upload":// TODO
 				break;
@@ -150,6 +152,8 @@ public class MainServer {
 				break;
 			case "exit":
 				running = false;
+				info.add("Vous avez été déconnecté avec succès\n");
+				sendInfoToClient(info);
 				break;
 			default:
 				break;					
