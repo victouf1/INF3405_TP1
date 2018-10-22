@@ -1,68 +1,78 @@
 package org.client;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Stack;
+
+import javax.swing.JFrame;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 
 public class MainClient {
+
+	private DataInputStream in;
+	private DataOutputStream out;
+	private JFrame frame = new JFrame("Capitalize Client");
+	private JTextField dataField = new JTextField(40);
+	private JTextArea messageArea = new JTextArea(8, 60);
+	
 	public static void main(String[] args) throws UnknownHostException, IOException, ClassNotFoundException {
-		
-		Socket clientSocket = null;
-		try {
-			clientSocket = new Socket("127.0.0.1", 5000);
-			ObjectOutputStream objectOutput = new ObjectOutputStream(clientSocket.getOutputStream());
-			List<String> linesToSend = readFile("text.txt");
-			objectOutput.writeObject(linesToSend);
-			objectOutput.flush();
-			ObjectInputStream obj = new ObjectInputStream(clientSocket.getInputStream());
-			@SuppressWarnings("unchecked")
-			Stack<String> receivedStack = (Stack<String>) obj.readObject();
-			writeToFile(receivedStack, "FichierInversee.txt");
-		} finally {
-			clientSocket.close();
+
+		MainClient client = new MainClient();
+		client.frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		client.frame.pack();
+		client.frame.setVisible(true);
+		client.connectToServer();
+	}
+	
+	public MainClient() {
+
+		// Layout GUI
+		messageArea.setEditable(false);
+		frame.getContentPane().add(dataField, "North");
+		frame.getContentPane().add(new JScrollPane(messageArea), "Center");
+
+		// Add Listeners
+		dataField.addActionListener(new ActionListener() {
+			/**
+			 * Responds to pressing the enter key in the textfield by sending the contents
+			 * of the text field to the server and displaying the response from the server
+			 * in the text area. If the response is "." we exit the whole application, which
+			 * closes all sockets, streams and windows.
+			 */
+			public void actionPerformed(ActionEvent e) {
+				//envoie du fichier
+				// TODO reception du fichier
+//				Util.recieveFile(dataField.getText(), in);
+				messageArea.append("succeeeeeed \n");
+				dataField.selectAll();
+			}
+		});
+	}
+	
+	@SuppressWarnings("resource")
+	public void connectToServer() throws IOException {
+
+		// Get the server address from a dialog box.
+		String serverAddress = GuiUtil.getIPAdress();
+		int port = GuiUtil.getPort();
+
+		Socket socket;
+		socket = new Socket(serverAddress, port);
+
+		System.out.format("The capitalization server is running on %s:%d%n", serverAddress, port);
+
+		in = new DataInputStream(socket.getInputStream());
+		out = new DataOutputStream(socket.getOutputStream());
+
+		// Consume the initial welcoming messages from the server
+		for (int i = 0; i < 3; i++) {
+			messageArea.append(i + "\n");
 		}
 	}
 	
-	// Fonction permettant de lire un fichier et de stocker son contenu dans une liste.
-	private static List<String> readFile(String nomFichier) throws IOException {
-		List<String> listOfLines = new ArrayList<String>();
-		String line = null;
-		FileReader fileReader = null;
-		BufferedReader bufferedReader = null;
-		try {
-			fileReader = new FileReader(nomFichier);
-
-			bufferedReader = new BufferedReader(fileReader);
-
-			while ((line = bufferedReader.readLine()) != null) {
-				listOfLines.add(line);
-			}
-		} finally {
-			fileReader.close();
-			bufferedReader.close();
-		}
-		return listOfLines;
-	}
-
-	// Fonction permettant d'écrire dans un fichier les données contenues dans la
-	// stack reçu du serveur.
-	private static void writeToFile(Stack<String> myStack, String nomFichier) throws IOException {
-		BufferedWriter out = null;
-		try {
-			out = new BufferedWriter(new FileWriter(nomFichier));
-			while (!myStack.isEmpty()) {
-				out.write(myStack.pop() + "\n");
-			}
-		} finally {
-			out.close();
-		}
-	}
 }
