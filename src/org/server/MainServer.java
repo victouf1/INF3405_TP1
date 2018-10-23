@@ -3,8 +3,11 @@ package org.server;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -14,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 
@@ -27,7 +31,7 @@ public class MainServer {
 		// String serverAddress = GuiUtil.getIPAdress();
 		// int port = GuiUtil.getPort();
 
-		InetAddress IPAddress = InetAddress.getByName(/* serverAddress */"127.0.0.1");
+		InetAddress IPAddress = InetAddress.getByName(/* serverAddress */"192.168.0.100");
 		serverSocket = new ServerSocket();
 		serverSocket.setReuseAddress(true);
 		serverSocket.bind(new InetSocketAddress(IPAddress, /* port */5000));
@@ -52,23 +56,20 @@ public class MainServer {
 		public Client(Socket socket) {
 			this.socket = socket;
 			try {
-				objectOutput = new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream()));
-				objectOutput.flush();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
+			objectOutput = new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+			objectOutput.flush();
+			}catch(IOException e) {
 				e.printStackTrace();
 			}
 		}
 
 		public void run() {
 			try {
-
 				initializePath();
 				while (running) {
 					String action = getAction();
 					if (action != null) {
-						System.out
-								.println(GuiUtil.getOut(socket.getInetAddress().toString(), socket.getPort(), action));
+						System.out.println(GuiUtil.getOut(socket.getInetAddress().toString(), socket.getPort(), action));
 						doAction(action);
 					}
 				}
@@ -100,8 +101,6 @@ public class MainServer {
 				BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 //				ObjectInputStream in = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
 				action = (String) in.readLine();
-
-				System.out.println(action);
 				return action;
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -109,8 +108,7 @@ public class MainServer {
 					running = false;
 					socket.close();
 				} catch (IOException f) {
-					// TODO Auto-generated catch block
-					f.printStackTrace();
+					return "";
 				}
 				return "";
 			}
@@ -148,8 +146,10 @@ public class MainServer {
 				sendInfoToClient(info);
 				break;
 			case "upload":// TODO
+				uploadAction();
 				break;
 			case "download":// TODO
+				downloadAction(name);
 				break;
 			case "exit":
 				running = false;
@@ -272,6 +272,64 @@ public class MainServer {
 			}
 
 			sendInfoToClient(info);
+		}
+		
+		private void downloadAction(String name) throws CancellationException {	                   
+			File file = new File(userPath.toString(), name);
+			ObjectOutputStream oos;
+			try {
+				 oos = new ObjectOutputStream(socket.getOutputStream());
+		         oos.writeObject(file.getName());
+		   	  
+		         FileInputStream fis = new FileInputStream(file);
+		         byte [] buffer = new byte[100];
+		         Integer bytesRead = 0;
+		  
+		         while ((bytesRead = fis.read(buffer)) > 0) {
+		             oos.writeObject(bytesRead);
+		             oos.writeObject(Arrays.copyOf(buffer, buffer.length));
+		         }
+		         
+		         fis.close();
+			} catch (Exception e) {
+				List<String> info = new ArrayList<String>();
+				info.add("An error occured during the transfer");
+				sendInfoToClient(info);
+			}  
+		}
+		
+		private void uploadAction() throws CancellationException {	                   
+			try {
+				ObjectInputStream ois = null;
+				ois = new ObjectInputStream(socket.getInputStream());
+				
+				FileOutputStream fos = null;
+		        byte [] buffer = new byte[100];
+		        Object o;
+		        
+		        o = ois.readObject();
+		        
+		        if (o instanceof String)
+		        {
+					fos = new FileOutputStream(userPath.toString() + "\\" + o.toString());
+		        }
+		        
+		        Integer bytesRead = 0;
+		        do {
+					o = ois.readObject();
+					bytesRead = (Integer)o;
+					o = ois.readObject();
+					buffer = (byte[])o;
+					// 3. Write data to output file.
+		            fos.write(buffer, 0, bytesRead);     
+		        } while (bytesRead == 100);
+		        
+		        fos.close();
+			} catch (Exception e) {
+				List<String> info = new ArrayList<String>();
+				info.add("An error occured during the transfer");
+				sendInfoToClient(info);
+			}        
 		}
 	}
 }
