@@ -1,9 +1,7 @@
 package org.client;
 
-
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.BufferedInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -13,173 +11,163 @@ import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Scanner;
 
-import javax.swing.JFrame;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
+import org.common.ExchangesUtil;
+import org.common.GuiUtil;
 
+/**
+ * classe exécutable du client
+ */
 public class MainClient {
 
-	private ObjectInputStream in;
-	private PrintWriter out;
-	private Socket socket;
-	private JFrame frame = new JFrame("Capitalize Client");
-	private JTextField dataField = new JTextField(40);
-	private JTextArea messageArea = new JTextArea(8, 60);
+	private ObjectInputStream m_ObjectInput;
+	private PrintWriter m_Output;
+	private Socket m_Socket;
+	Scanner m_ConsoleScanner = new Scanner(System.in);
 
+	/**
+	 * exécutable
+	 */
 	public static void main(String[] args) throws UnknownHostException, IOException, ClassNotFoundException {
-
+		// crée le client
 		MainClient client = new MainClient();
-		client.frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		client.frame.pack();
-		client.frame.setVisible(true);
 		try {
+			// se connecte au client
 			client.connectToServer();
+			while (true) {
+				// attends et fait les instruction par la commande
+				client.readAndDoCommand();
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
+		} finally {
+			// on ferme tout
+			client.close();
 		}
 	}
 
-	public MainClient() {
+	/**
+	 * Attends la commande de la console et l'exécute
+	 */
+	@SuppressWarnings("unchecked")
+	private void readAndDoCommand() {
+		// on lit la commande passée en console
+		String command = m_ConsoleScanner.nextLine();
+		// on l'envoie au serveur
+		m_Output.println(command);
+		m_Output.flush();
 
-		// Layout GUI
-		messageArea.setEditable(false);
-		frame.getContentPane().add(dataField, "North");
-		frame.getContentPane().add(new JScrollPane(messageArea), "Center");
-
-		// Add Listeners
-		dataField.addActionListener(new ActionListener() {
-			/**
-			 * Responds to pressing the enter key in the textfield by sending the contents
-			 * of the text field to the server and displaying the response from the server
-			 * in the text area. If the response is "." we exit the whole application, which
-			 * closes all sockets, streams and windows.
-			 */
-			public void actionPerformed(ActionEvent e) {
-				messageArea.append(dataField.getText()+ "\n");
-				out.println(dataField.getText()+ "\n");
-				out.flush();
-				
-				String command = dataField.getText();
-				String name = "";
-				if (command.contains(" ")) {
-					String[] commandAndName = command.split(" ",2);
-					command = commandAndName[0];
-					name = commandAndName[1];
+		String name = "";
+		if (command.contains(" ")) {
+			String[] commandAndName = command.split(" ", 2);
+			command = commandAndName[0];
+			name = commandAndName[1];
+		}
+		// cas du download et de l'upload à gérer différemment
+		if (command.equals("download"))
+			downloadAction();
+		else if (command.equals("upload"))
+			uploadAction(name);
+		// cas normal où l'on transfère que des string et listes de string
+		else {
+			List<String> response;
+			try {
+				// lecture de la réponse
+				response = (List<String>) m_ObjectInput.readObject();
+				if (response == null) {
+					System.exit(0);
 				}
-				
-				if(command.equals("download"))
-					downloadAction();
-				else if(command.equals("upload"))
-					uploadAction(name);
-				else
-				{			
-					List<String> response;
-					try {
-						response = (List<String>) in.readObject();
-						for(int i= 0; i < response.size(); i++)
-							System.out.println(response.get(i));
-						if (response == null || response.equals("")) {
-							System.exit(0);
-						}
-					} catch (IOException | ClassNotFoundException ex) {
-						response = new ArrayList<>();
-						response.add("Error: " + ex);
-					}
-					for(int i= 0; i < response.size(); i++)
-						messageArea.append(response.get(i) + "\n");
-					messageArea.append("\n");
-					dataField.selectAll();
-				}
+			} catch (EOFException e) {
+				// cas où l'on est déconnecté du serveur
+				response = new ArrayList<>();
+				response.add("Erreur vous êtes déconnectés du serveur");
+			} catch (IOException | ClassNotFoundException ex) {
+				response = new ArrayList<>();
+				response.add("Error: " + ex);
 			}
-		});
+			// affichage de la réponse
+			for (int i = 0; i < response.size(); i++)
+				System.out.println(response.get(i));
+		}
 	}
 
+	/**
+	 * se connecte au serveur
+	 */
 	@SuppressWarnings("resource")
-	public void connectToServer() throws IOException {
+	private void connectToServer() throws IOException {
 
-		// Get the server address from a dialog box.
+		// Recupere l'adresse IP et le port
 		String serverAddress = GuiUtil.getIPAdress();
 		int port = GuiUtil.getPort();
-		// CONNECTEXCEPTION
-		socket = new Socket(serverAddress, port);
+		// TODO CONNECTEXCEPTION
+		// création du socket
+		m_Socket = new Socket(serverAddress, port);
 
-		System.out.format("The capitalization server is running on %s:%d%n", serverAddress, port);
+		System.out.format("Vous êtes connectés au serveur %s:%d%n", serverAddress, port);
 
-		in = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
-		out = new PrintWriter(socket.getOutputStream());
+		// création des input et output
+		m_ObjectInput = new ObjectInputStream(new BufferedInputStream(m_Socket.getInputStream()));
+		m_Output = new PrintWriter(m_Socket.getOutputStream());
+	}
 
-		// Consume the initial welcoming messages from the server
-		for (int i = 0; i < 3; i++) {
-			messageArea.append(i + "\n");
+	/**
+	 * ferme le client
+	 */
+	private void close() throws IOException {
+		m_ConsoleScanner.close();
+		m_Socket.close();
+	}
+
+	/**
+	 * fait la commande download (du serveur vers le client)
+	 */
+	private void downloadAction() {
+		try {
+			ExchangesUtil.upload(m_Socket, "C:\\Users\\" + System.getProperty("user.name") + "\\Downloads");
+			System.out.println("Le fichier à bien été téléchargé");
+		} catch (Exception e) {
+			System.out.println("Erreur lors du téléchargement du fichier");
+			e.printStackTrace();
 		}
 	}
-	
-    public void downloadAction() {
-		try {
-			ObjectInputStream ois = null;
-			ois = new ObjectInputStream(socket.getInputStream());
-			
-			FileOutputStream fos = null;
-	        byte [] buffer = new byte[100];
-	        Object o;
-	        
-	        o = ois.readObject();
-	        String name = o.toString();
-	        
-	        if (o instanceof String)
-	        {
-	        	String userName = System.getProperty("user.name");
-				fos = new FileOutputStream("C:\\Users\\"+ userName + "\\Downloads\\" + name);
-	        }
-	        
-	        Integer bytesRead = 0;
-	        do {
-				o = ois.readObject();
-				bytesRead = (Integer)o;
-				o = ois.readObject();
-				buffer = (byte[])o;
-				// 3. Write data to output file.
-	            fos.write(buffer, 0, bytesRead);     
-	        } while (bytesRead == 100);
-	        
-	        fos.close();
-	        
-			System.out.println("Le fichier " + name + " à bien été téléchargé");
-			messageArea.append("Le fichier " + name + " à bien été téléchargé");
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}      
-    }
-    
-    public void uploadAction(String name) {
-    	File file = new File(name);
-		ObjectOutputStream oos;
-		try {
-			 oos = new ObjectOutputStream(socket.getOutputStream());
-	         oos.writeObject(file.getName());
-	   	  
-	         FileInputStream fis = new FileInputStream(file);
-	         byte [] buffer = new byte[100];
-	         Integer bytesRead = 0;
-	  
-	         while ((bytesRead = fis.read(buffer)) > 0) {
-	             oos.writeObject(bytesRead);
-	             oos.writeObject(Arrays.copyOf(buffer, buffer.length));
-	         }
-	         
-	         fis.close();
-	         
 
-			System.out.println("Le fichier " + file.getName() + " à bien été téléversé\n");
-			messageArea.append("Le fichier " + file.getName() + " à bien été téléversé\n");
-		} catch (Exception e) {
-			e.printStackTrace();
-		}      
-    }
+	/**
+	 * fait la commande upload (du client vers le serveur)
+	 * 
+	 * @param name path du fichier à upload
+	 */
+	private void uploadAction(String name) {
+		if (Files.exists(Paths.get(name)) && new File(name).isFile()) {
+			File file = new File(name);
+			ObjectOutputStream oos;
+			try {
+				oos = new ObjectOutputStream(m_Socket.getOutputStream());
+				oos.writeObject(file.getName());
+
+				FileInputStream fis = new FileInputStream(file);
+				byte[] buffer = new byte[100];
+				Integer bytesRead = 0;
+
+				while ((bytesRead = fis.read(buffer)) > 0) {
+					oos.writeObject(bytesRead);
+					oos.writeObject(Arrays.copyOf(buffer, buffer.length));
+				}
+
+				fis.close();
+
+				System.out.println("Le fichier " + file.getName() + " à bien été téléversé\n");
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		} else {
+			System.out.println("Ce n'est pas un fichier!\n");
+		}
+	}
 }

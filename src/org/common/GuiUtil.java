@@ -1,4 +1,4 @@
-package org.client;
+package org.common;
 
 import java.awt.Frame;
 import java.text.SimpleDateFormat;
@@ -7,8 +7,6 @@ import java.util.concurrent.CancellationException;
 
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
-
-import com.sun.org.apache.xerces.internal.impl.xpath.regex.ParseException;
 
 public class GuiUtil {
 	public static String getOut(String IP, int port, String action) {
