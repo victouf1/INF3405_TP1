@@ -347,7 +347,7 @@ public class MainServer {
 		 * @param name fichier à download
 		 */
 		private void downloadAction(String name) {
-			if (Files.exists(Paths.get(m_UserPath.toString(), name))
+			if (Files.exists(Paths.get(m_UserPath.toString(), name)) // TODO invalidPathException
 					&& new File(m_UserPath.toString(), name).isFile()) {
 				File file = new File(m_UserPath.toString(), name);
 				ObjectOutputStream oos;
