@@ -3,21 +3,18 @@ package org.server;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 
@@ -109,7 +106,6 @@ public class MainServer {
 				// on ferme le socket quand on a finit
 				m_Socket.close();
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -347,36 +343,24 @@ public class MainServer {
 		 * @param name fichier à download
 		 */
 		private void downloadAction(String name) {
-			if (Files.exists(Paths.get(m_UserPath.toString(), name)) // TODO invalidPathException
-					&& new File(m_UserPath.toString(), name).isFile()) {
+			try {
 				File file = new File(m_UserPath.toString(), name);
-				ObjectOutputStream oos;
-				try {
-					// on envoit au client
-					oos = new ObjectOutputStream(m_Socket.getOutputStream());
-					oos.writeObject(file.getName());
-
-					FileInputStream fis = new FileInputStream(file);
-					byte[] buffer = new byte[100];
-					Integer bytesRead = 0;
-					// on lit le fichier et on l'écrit en même temps pour l'envoie au client
-					while ((bytesRead = fis.read(buffer)) > 0) {
-						oos.writeObject(bytesRead);
-						oos.writeObject(Arrays.copyOf(buffer, buffer.length));
-					}
-
-					fis.close();
-				} catch (Exception e) {
-					// TODO robustesse
-					List<String> info = new ArrayList<String>();
-					info.add("An error occured during the transfer");
-					sendInfoToClient(info);
+				if (file.exists() && file.isFile()) {
+					// l'action download est un upload du point de vue du serveur
+					ExchangesUtil.upload(file, m_Socket);
+				} else {
+					throw new InvalidPathException(file.getAbsolutePath(), "");
 				}
-			} else {
+			} catch (InvalidPathException e1) {
 				List<String> info = new ArrayList<String>();
 				info.add("Le fichier n'existe pas!\n");
 				sendInfoToClient(info);
+			} catch (IOException e2) {
+				List<String> info = new ArrayList<String>();
+				info.add("An error occured during the transfer");
+				sendInfoToClient(info);
 			}
+
 		}
 
 		/**
@@ -384,7 +368,8 @@ public class MainServer {
 		 */
 		private void uploadAction() {
 			try {
-				ExchangesUtil.upload(m_Socket, m_UserPath.toString());
+				// l'action upload est un download du point de vue du serveur
+				ExchangesUtil.download(m_Socket, m_UserPath.toString());
 			} catch (Exception e) {
 				List<String> info = new ArrayList<String>();
 				info.add("Une Erreur a eu lieu durant le transfert");

@@ -3,18 +3,13 @@ package org.client;
 import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
@@ -100,16 +95,18 @@ public class MainClient {
 	/**
 	 * se connecte au serveur
 	 */
-	@SuppressWarnings("resource")
 	private void connectToServer() throws IOException {
 
 		// Recupere l'adresse IP et le port
 		String serverAddress = GuiUtil.getIPAdress();
 		int port = GuiUtil.getPort();
-		// TODO CONNECTEXCEPTION
-		// création du socket
-		m_Socket = new Socket(serverAddress, port);
-
+		// création du socket, le temps qu'on arrive pas à créer le socket, on redemande
+		// une adresse IP et Port
+		try {
+			m_Socket = new Socket(serverAddress, port);
+		} catch (Exception e) {
+			connectToServer();
+		}
 		System.out.format("Vous êtes connectés au serveur %s:%d%n", serverAddress, port);
 
 		// création des input et output
@@ -130,7 +127,7 @@ public class MainClient {
 	 */
 	private void downloadAction() {
 		try {
-			ExchangesUtil.upload(m_Socket, "C:\\Users\\" + System.getProperty("user.name") + "\\Downloads");
+			ExchangesUtil.download(m_Socket, "C:\\Users\\" + System.getProperty("user.name") + "\\Downloads");
 			System.out.println("Le fichier à bien été téléchargé");
 		} catch (Exception e) {
 			System.out.println("Erreur lors du téléchargement du fichier");
@@ -144,30 +141,19 @@ public class MainClient {
 	 * @param name path du fichier à upload
 	 */
 	private void uploadAction(String name) {
-		if (Files.exists(Paths.get(name)) && new File(name).isFile()) {
+		try {
 			File file = new File(name);
-			ObjectOutputStream oos;
-			try {
-				oos = new ObjectOutputStream(m_Socket.getOutputStream());
-				oos.writeObject(file.getName());
-
-				FileInputStream fis = new FileInputStream(file);
-				byte[] buffer = new byte[100];
-				Integer bytesRead = 0;
-
-				while ((bytesRead = fis.read(buffer)) > 0) {
-					oos.writeObject(bytesRead);
-					oos.writeObject(Arrays.copyOf(buffer, buffer.length));
-				}
-
-				fis.close();
-
+			if (file.exists() && file.isFile()) {
+				ExchangesUtil.upload(file, m_Socket);
 				System.out.println("Le fichier " + file.getName() + " à bien été téléversé\n");
-			} catch (Exception e) {
-				e.printStackTrace();
+			} else {
+				throw new InvalidPathException(name, "");
 			}
-		} else {
-			System.out.println("Ce n'est pas un fichier!\n");
+		} catch (InvalidPathException e1) {
+			System.out.println("Ce n'est pas un fichier!");
+		} catch (IOException e2) {
+			System.out.println("Erreur lors de l'upload");
 		}
+
 	}
 }
