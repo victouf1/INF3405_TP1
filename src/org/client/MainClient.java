@@ -24,6 +24,7 @@ public class MainClient {
 	private ObjectInputStream m_ObjectInput;
 	private PrintWriter m_Output;
 	private Socket m_Socket;
+	public boolean m_Running = true;
 	Scanner m_ConsoleScanner = new Scanner(System.in);
 
 	/**
@@ -35,8 +36,8 @@ public class MainClient {
 		try {
 			// se connecte au client
 			client.connectToServer();
-			while (true) {
-				// attends et fait les instruction par la commande
+			while (client.m_Running) {
+				// attends et fait les instructions par la commande
 				client.readAndDoCommand();
 			}
 		} catch (IOException e) {
@@ -44,6 +45,7 @@ public class MainClient {
 		} finally {
 			// on ferme tout
 			client.close();
+			System.exit(0);
 		}
 	}
 
@@ -70,26 +72,12 @@ public class MainClient {
 		else if (command.equals("upload"))
 			uploadAction(name);
 		// cas normal où l'on transfère que des string et listes de string
-		else {
-			List<String> response;
-			try {
-				// lecture de la réponse
-				response = (List<String>) m_ObjectInput.readObject();
-				if (response == null) {
-					System.exit(0);
-				}
-			} catch (EOFException e) {
-				// cas où l'on est déconnecté du serveur
-				response = new ArrayList<>();
-				response.add("Erreur vous êtes déconnectés du serveur");
-			} catch (IOException | ClassNotFoundException ex) {
-				response = new ArrayList<>();
-				response.add("Error: " + ex);
-			}
-			// affichage de la réponse
-			for (int i = 0; i < response.size(); i++)
-				System.out.println(response.get(i));
+		else if(command.equals("exit")) {
+			readResponse();
+			m_Running = false;
 		}
+		else
+			readResponse();
 	}
 
 	/**
@@ -113,6 +101,31 @@ public class MainClient {
 		m_ObjectInput = new ObjectInputStream(new BufferedInputStream(m_Socket.getInputStream()));
 		m_Output = new PrintWriter(m_Socket.getOutputStream());
 	}
+	
+	/**
+	 * lit la réponse du serveur
+	 */
+	private void readResponse() {
+		List<String> response;
+		try {
+			// lecture de la réponse
+			response = (List<String>) m_ObjectInput.readObject();
+			if (response == null) {
+				System.exit(0);
+			}
+		} catch (EOFException e) {
+			// cas où l'on est déconnecté du serveur
+			response = new ArrayList<>();
+			response.add("Erreur vous êtes déconnectés du serveur");
+		} catch (IOException | ClassNotFoundException ex) {
+			response = new ArrayList<>();
+			response.add("Error: " + ex);
+		}
+		
+		// affichage de la réponse
+		for (int i = 0; i < response.size(); i++)
+			System.out.println(response.get(i));
+	}
 
 	/**
 	 * ferme le client
@@ -127,11 +140,17 @@ public class MainClient {
 	 */
 	private void downloadAction() {
 		try {
-			ExchangesUtil.download(m_Socket, "C:\\Users\\" + System.getProperty("user.name") + "\\Downloads");
-			System.out.println("Le fichier à bien été téléchargé");
+			List<String> response = (List<String>) m_ObjectInput.readObject();
+			
+			if(response.get(0).equals("1"))
+			{
+				ExchangesUtil.download(m_Socket, "C:\\Users\\" + System.getProperty("user.name") + "\\Documents");
+				System.out.println("Le fichier à bien été téléchargé");
+			}
+			else
+				System.out.println(response.get(0));
 		} catch (Exception e) {
 			System.out.println("Erreur lors du téléchargement du fichier");
-			e.printStackTrace();
 		}
 	}
 

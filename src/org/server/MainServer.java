@@ -118,8 +118,7 @@ public class MainServer {
 		private void initializePath() {
 			// création du root dont le client ne pourra pas s'échaper dans l'espace serveur
 			String userName = System.getProperty("user.name");
-			m_RootPath = Paths.get("C:", "Users", userName, "Documents"); // TODO remplacer pour que ca marche dans le
-																			// laboratoire
+			m_RootPath = Paths.get("C:", "Users", userName, "Documents");
 			if (!Files.exists(Paths.get(m_RootPath.toString(), "root")))
 				new File(m_RootPath.toString(), "root").mkdir();
 			m_RootPath = Paths.get(m_RootPath.toString(), "root");
@@ -160,7 +159,7 @@ public class MainServer {
 			String name;
 			// on récupère la commande
 			if (action.contains(" ")) {
-				String[] commandAndName = action.split(" ");
+				String[] commandAndName = action.split(" ",2);
 				command = commandAndName[0];
 				name = commandAndName[1];
 			} else {
@@ -179,16 +178,22 @@ public class MainServer {
 				if (relativePath.toString().equals(""))
 					info.add(m_UserPath.toString().substring(m_UserPath.toString().lastIndexOf('\\') + 1));
 				else
-					info.add(relativePath.toString());
+					info.add("root\\" + relativePath.toString());
 				sendInfoToClient(info);
 				break;
 			case "ls":
 				lsAction();
 				break;
 			case "mkdir":
-				new File(m_UserPath.toString(), name).mkdir();
-				info.add("Le dossier " + name + " a été créé\n");
-				sendInfoToClient(info);
+				if(name != null && !name.isEmpty() && !name.trim().isEmpty()) {
+					new File(m_UserPath.toString(), name).mkdir();
+					info.add("Le dossier " + name + " a été créé\n");
+					sendInfoToClient(info);
+				} 
+				else {
+					info.add("Ce nom n'est pas supporté\n");
+					sendInfoToClient(info);
+				}
 				break;
 			case "upload":
 				uploadAction();
@@ -202,6 +207,8 @@ public class MainServer {
 				sendInfoToClient(info);
 				break;
 			default:
+				info.add("La commande n'existe pas\n");
+				sendInfoToClient(info);
 				break;
 			}
 		}
@@ -346,6 +353,9 @@ public class MainServer {
 			try {
 				File file = new File(m_UserPath.toString(), name);
 				if (file.exists() && file.isFile()) {
+					List<String> info = new ArrayList<String>();
+					info.add("1");
+					sendInfoToClient(info);
 					// l'action download est un upload du point de vue du serveur
 					ExchangesUtil.upload(file, m_Socket);
 				} else {
@@ -357,7 +367,7 @@ public class MainServer {
 				sendInfoToClient(info);
 			} catch (IOException e2) {
 				List<String> info = new ArrayList<String>();
-				info.add("An error occured during the transfer");
+				info.add("Une Erreur a eu lieu durant le dernier transfert");
 				sendInfoToClient(info);
 			}
 
@@ -372,7 +382,7 @@ public class MainServer {
 				ExchangesUtil.download(m_Socket, m_UserPath.toString());
 			} catch (Exception e) {
 				List<String> info = new ArrayList<String>();
-				info.add("Une Erreur a eu lieu durant le transfert");
+				info.add("Une Erreur a eu lieu durant le dernier transfert");
 				sendInfoToClient(info);
 			}
 		}
